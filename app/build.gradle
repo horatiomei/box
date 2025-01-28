@@ -20,7 +20,7 @@ android {
             if(variant.buildType.name.equals('release')){
                 // APK输出文件名规则：极剪-版本名-.apk
 //                def releaseApkName = "app_${variant.buildType.name}.apk"
-                def releaseApkName = "TVBox_301_${releaseTime()}_${variant.buildType.name}.apk"
+                def releaseApkName = "TVBox_乙巳春_${releaseTime()}_${variant.buildType.name}.apk"
                 // 设置apk输出文件夹
                 output.getPackageApplication().outputDirectory = new File(project.rootDir.absolutePath + "/Release")
                 // 设置apk输出文件名
