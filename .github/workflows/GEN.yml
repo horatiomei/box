@@ -30,9 +30,4 @@ jobs:
         with:
           name: box
           path: ${{ github.workspace }}/apk/*
-      - name: create github release
-        uses: softprops/action-gh-release@v2.0.8
-        with:
-          tag_name: latest
-          artifacts: "*.apk"
-          name: ${{github.ref_name}}
+      
