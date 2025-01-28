@@ -2,6 +2,8 @@ name: GENERATE APK
 
 on:
   push:
+          # tags:
+          #      - "v*"
     branches:
       - main
   workflow_dispatch:
@@ -32,4 +34,5 @@ jobs:
         uses: softprops/action-gh-release@v2.0.8
         with:
           tag_name: latest
+          artifacts: "*.apk"
           name: ${{github.ref_name}}
