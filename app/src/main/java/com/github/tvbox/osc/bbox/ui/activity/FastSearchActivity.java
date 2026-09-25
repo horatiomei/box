@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.chad.library.adapter.base.BaseQuickAdapter;
+import com.github.catvod.crawler.JsLoader;
 import com.github.tvbox.osc.bbox.R;
 import com.github.tvbox.osc.bbox.api.ApiConfig;
 import com.github.tvbox.osc.bbox.base.BaseActivity;
@@ -25,8 +26,9 @@ import com.github.tvbox.osc.bbox.ui.adapter.FastListAdapter;
 import com.github.tvbox.osc.bbox.ui.adapter.FastSearchAdapter;
 import com.github.tvbox.osc.bbox.ui.adapter.SearchWordAdapter;
 import com.github.tvbox.osc.bbox.util.FastClickCheckUtil;
+import com.github.tvbox.osc.bbox.util.HawkConfig;
+import com.github.tvbox.osc.bbox.util.HistoryHelper;
 import com.github.tvbox.osc.bbox.util.SearchHelper;
-import com.github.tvbox.osc.bbox.util.js.JSEngine;
 import com.github.tvbox.osc.bbox.viewmodel.SourceViewModel;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -34,6 +36,7 @@ import com.google.gson.JsonElement;
 import com.lzy.okgo.OkGo;
 import com.lzy.okgo.callback.AbsCallback;
 import com.lzy.okgo.model.Response;
+import com.orhanobut.hawk.Hawk;
 import com.owen.tvrecyclerview.widget.TvRecyclerView;
 import com.owen.tvrecyclerview.widget.V7GridLayoutManager;
 import com.owen.tvrecyclerview.widget.V7LinearLayoutManager;
@@ -64,12 +67,7 @@ public class FastSearchActivity extends BaseActivity {
     private TvRecyclerView mGridViewWord;
     private TvRecyclerView mGridViewWordFenci;
     SourceViewModel sourceViewModel;
-    //    private EditText etSearch;
-//    private TextView tvSearch;
-//    private TextView tvClear;
-//    private SearchKeyboard keyboard;
-//    private TextView tvAddress;
-//    private ImageView ivQRCode;
+
     private SearchWordAdapter searchWordAdapter;
     private FastSearchAdapter searchAdapter;
     private FastSearchAdapter searchAdapterFilter;
@@ -79,10 +77,10 @@ public class FastSearchActivity extends BaseActivity {
     private boolean isFilterMode = false;
     private String searchFilterKey = "";    // 过滤的key
     private HashMap<String, ArrayList<Movie.Video>> resultVods; // 搜索结果
-    private List<String> quickSearchWord = new ArrayList<>();
+    private final List<String> quickSearchWord = new ArrayList<>();
     private HashMap<String, String> mCheckSources = null;
 
-    private View.OnFocusChangeListener focusChangeListener = new View.OnFocusChangeListener() {
+    private final View.OnFocusChangeListener focusChangeListener = new View.OnFocusChangeListener() {
         @Override
         public void onFocusChange(View itemView, boolean hasFocus) {
             try {
@@ -145,25 +143,15 @@ public class FastSearchActivity extends BaseActivity {
         spListAdapter = new FastListAdapter();
         mGridViewWord.setAdapter(spListAdapter);
 
-
-//        mGridViewWord.setFocusable(true);
-//        mGridViewWord.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-//            @Override
-//            public void onFocusChange(View itemView, boolean hasFocus) {}
-//        });
-
         mGridViewWord.addOnChildAttachStateChangeListener(new RecyclerView.OnChildAttachStateChangeListener() {
             @Override
             public void onChildViewAttachedToWindow(@NonNull View child) {
                 child.setFocusable(true);
                 child.setOnFocusChangeListener(focusChangeListener);
                 TextView t = (TextView) child;
-                if (t.getText() == "全部显示") {
+                if (t.getText() == "全部") {
                     t.requestFocus();
                 }
-//                if (child.isFocusable() && null == child.getOnFocusChangeListener()) {
-//                    child.setOnFocusChangeListener(focusChangeListener);
-//                }
             }
 
             @Override
@@ -196,7 +184,7 @@ public class FastSearchActivity extends BaseActivity {
                         if (searchExecutorService != null) {
                             pauseRunnable = searchExecutorService.shutdownNow();
                             searchExecutorService = null;
-                            JSEngine.getInstance().stopAll();
+                            JsLoader.stopAll();
                         }
                     } catch (Throwable th) {
                         th.printStackTrace();
@@ -223,7 +211,7 @@ public class FastSearchActivity extends BaseActivity {
                         if (searchExecutorService != null) {
                             pauseRunnable = searchExecutorService.shutdownNow();
                             searchExecutorService = null;
-                            JSEngine.getInstance().stopAll();
+                            JsLoader.stopAll();
                         }
                     } catch (Throwable th) {
                         th.printStackTrace();
@@ -258,7 +246,7 @@ public class FastSearchActivity extends BaseActivity {
     }
 
     private void filterResult(String spName) {
-        if (spName == "全部显示") {
+        if (spName.equals("全部")) {
             mGridView.setVisibility(View.VISIBLE);
             mGridViewFilter.setVisibility(View.GONE);
             return;
@@ -277,40 +265,43 @@ public class FastSearchActivity extends BaseActivity {
 
     private void fenci() {
         if (!quickSearchWord.isEmpty()) return; // 如果经有分词了，不再进行二次分词
+        quickSearchWord.addAll(SearchHelper.splitWords(searchTitle));
+        List<String> words = new ArrayList<>(new HashSet<>(quickSearchWord));
+        EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_QUICK_SEARCH_WORD, words));
         // 分词
-        OkGo.<String>get("http://api.pullword.com/get.php?source=" + URLEncoder.encode(searchTitle) + "&param1=0&param2=0&json=1")
-                .tag("fenci")
-                .execute(new AbsCallback<String>() {
-                    @Override
-                    public String convertResponse(okhttp3.Response response) throws Throwable {
-                        if (response.body() != null) {
-                            return response.body().string();
-                        } else {
-                            throw new IllegalStateException("网络请求错误");
-                        }
-                    }
-
-                    @Override
-                    public void onSuccess(Response<String> response) {
-                        String json = response.body();
-                        quickSearchWord.clear();
-                        try {
-                            for (JsonElement je : new Gson().fromJson(json, JsonArray.class)) {
-                                quickSearchWord.add(je.getAsJsonObject().get("t").getAsString());
-                            }
-                        } catch (Throwable th) {
-                            th.printStackTrace();
-                        }
-                        quickSearchWord.addAll(SearchHelper.splitWords(searchTitle));
-                        List<String> words = new ArrayList<>(new HashSet<>(quickSearchWord));
-                        EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_QUICK_SEARCH_WORD, words));
-                    }
-
-                    @Override
-                    public void onError(Response<String> response) {
-                        super.onError(response);
-                    }
-                });
+//        OkGo.<String>get("http://api.pullword.com/get.php?source=" + URLEncoder.encode(searchTitle) + "&param1=0&param2=0&json=1")
+//                .tag("fenci")
+//                .execute(new AbsCallback<String>() {
+//                    @Override
+//                    public String convertResponse(okhttp3.Response response) throws Throwable {
+//                        if (response.body() != null) {
+//                            return response.body().string();
+//                        } else {
+//                            throw new IllegalStateException("网络请求错误");
+//                        }
+//                    }
+//
+//                    @Override
+//                    public void onSuccess(Response<String> response) {
+//                        String json = response.body();
+//                        quickSearchWord.clear();
+//                        try {
+//                            for (JsonElement je : new Gson().fromJson(json, JsonArray.class)) {
+//                                quickSearchWord.add(je.getAsJsonObject().get("t").getAsString());
+//                            }
+//                        } catch (Throwable th) {
+//                            th.printStackTrace();
+//                        }
+//                        quickSearchWord.addAll(SearchHelper.splitWords(searchTitle));
+//                        List<String> words = new ArrayList<>(new HashSet<>(quickSearchWord));
+//                        EventBus.getDefault().post(new RefreshEvent(RefreshEvent.TYPE_QUICK_SEARCH_WORD, words));
+//                    }
+//
+//                    @Override
+//                    public void onError(Response<String> response) {
+//                        super.onError(response);
+//                    }
+//                });
     }
 
     private void initData() {
@@ -347,7 +338,8 @@ public class FastSearchActivity extends BaseActivity {
             }
         }
         if (mSearchTitle != null) {
-            mSearchTitle.setText(String.format("搜索(%d/%d)", resultVods.size(), spNames.size()));
+//            mSearchTitle.setText(String.format("搜索(%d/%d)", resultVods.size(), startSearchNum));
+            mSearchTitle.setText(String.format("已搜索( %d )", resultVods.size()));
         }
     }
 
@@ -371,18 +363,21 @@ public class FastSearchActivity extends BaseActivity {
         isFilterMode = false;
         spNames.clear();
 
+        //写入历史记录
+        HistoryHelper.setSearchHistory(title);
+
         searchResult();
     }
 
     private ExecutorService searchExecutorService = null;
-    private AtomicInteger allRunCount = new AtomicInteger(0);
+    private final AtomicInteger allRunCount = new AtomicInteger(0);
 
     private void searchResult() {
         try {
             if (searchExecutorService != null) {
                 searchExecutorService.shutdownNow();
                 searchExecutorService = null;
-                JSEngine.getInstance().stopAll();
+                JsLoader.stopAll();
             }
         } catch (Throwable th) {
             th.printStackTrace();
@@ -403,7 +398,7 @@ public class FastSearchActivity extends BaseActivity {
         ArrayList<String> hots = new ArrayList<>();
 
         spListAdapter.setNewData(hots);
-        spListAdapter.addData("全部显示");
+        spListAdapter.addData("全部");
         for (SourceBean bean : searchRequestList) {
             if (!bean.isSearchable()) {
                 continue;
@@ -463,7 +458,7 @@ public class FastSearchActivity extends BaseActivity {
         for(String one : arr) {
             if (name.contains(one)) matchNum++;
         }
-        return matchNum == arr.length ? true : false;
+        return matchNum == arr.length;
     }
 
     private void searchData(AbsXml absXml) {
@@ -495,7 +490,7 @@ public class FastSearchActivity extends BaseActivity {
 
         int count = allRunCount.decrementAndGet();
         if (count <= 0) {
-            if (searchAdapter.getData().size() <= 0) {
+            if (searchAdapter.getData().size() == 0) {
                 showEmpty();
             }
             cancel();
@@ -514,11 +509,17 @@ public class FastSearchActivity extends BaseActivity {
             if (searchExecutorService != null) {
                 searchExecutorService.shutdownNow();
                 searchExecutorService = null;
-                JSEngine.getInstance().stopAll();
+                JsLoader.stopAll();
             }
         } catch (Throwable th) {
             th.printStackTrace();
         }
         EventBus.getDefault().unregister(this);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        Hawk.put(HawkConfig.ACTIVITY_ID, 1);
     }
 }

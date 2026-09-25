@@ -17,20 +17,13 @@ android {
             def oldFile = output.outputFile
             def newName = '';
             //只有release编译时生效
-            if(variant.buildType.name.equals('release')){
-                // APK输出文件名规则：极剪-版本名-.apk
-//                def releaseApkName = "app_${variant.buildType.name}.apk"
+            if(variant.buildType.name == 'release') {
                 def releaseApkName = "TVBox_乙巳春_${releaseTime()}.apk"
-                //def releaseApkName = "TVBox_乙巳春_${releaseTime()}_${variant.buildType.name}.apk"
                 // 设置apk输出文件夹
                 output.getPackageApplication().outputDirectory = new File(project.rootDir.absolutePath + "/Release")
                 // 设置apk输出文件名
                 output.outputFileName = releaseApkName
             }
-//            def outputFile = output.outputFile
-//            if (outputFile != null && outputFile.name.endsWith('.apk')) {
-//                outputFileName = "玉幂草_SHJ_${releaseTime()}_{$buildTypes}.apk"
-//            }
         }
     }
 
@@ -39,7 +32,7 @@ android {
         minSdkVersion 16
         //noinspection ExpiredTargetSdkVersion
         targetSdkVersion 26
-        versionCode 18
+        versionCode 27
         versionName '0.0.0'
         multiDexEnabled true
         //设置room的Schema的位置
@@ -74,6 +67,13 @@ android {
         }
     }
 
+    // 禁用 ABI 分割
+    splits {
+        abi {
+            enable false // 禁用 ABI 分割
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
@@ -96,8 +96,14 @@ def releaseTime() {
     return new Date().format("yyyyMMddHHmm", TimeZone.getTimeZone("GMT+08:00"))
 }
 
+task DEBUG_APP(type: Exec) {
+    dependsOn 'installDebug' // 先安装 debug 包
+    commandLine 'd:/Knowledge/module/adb/adb.exe', 'shell', 'am', 'start', '-n',
+            'tv.org.eu.bunnyabc/com.github.tvbox.osc.bbox.ui.activity.HomeActivity'
+}
+
 dependencies {
-    api fileTree(dir: "libs", include: ["*.jar"])
+    api fileTree(dir: "libs", include: ["*.jar","*.aar"])
 
 //    implementation 'com.github.xuexiangjys:XUpdate:2.1.2' // 版本更新
 //     for WebDAV
@@ -106,15 +112,17 @@ dependencies {
 //        exclude group: 'com.squareup.okhttp3'
 //    }
 
+    implementation 'com.github.alidili:FlowLayout:v1.5'
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
-    implementation 'com.google.zxing:core:3.4.1'
+    implementation 'com.google.zxing:core:3.3.0'
     implementation 'androidx.appcompat:appcompat:1.3.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
     implementation 'androidx.lifecycle:lifecycle-extensions:2.2.0'
     implementation 'androidx.recyclerview:recyclerview:1.2.1'
-    implementation files('libs/thunder.jar')
-    implementation files('libs/commons-lang3-3.12.0.jar')
-    implementation files('libs/xupdate-lib-release.aar')
+    //implementation files('libs/thunder.jar')
+    //implementation files('libs/commons-lang3-3.12.0.jar')
+    //implementation files('libs/xwalk_shared_library-23.53.589.4.aar')
+    //implementation files('libs/xupdate-lib-release.aar')
 
     implementation 'com.squareup.okhttp3:okhttp:3.12.11'
     annotationProcessor 'androidx.room:room-compiler:2.3.0'
@@ -135,9 +143,9 @@ dependencies {
     implementation project(":player")
     implementation project(":quickjs")
 
-    implementation('org.xwalk:xwalk_shared_library:23.53.589.4') {
-        exclude group: 'com.android.support'
-    }
+//    implementation('org.xwalk:xwalk_shared_library:23.53.589.4') {
+//        exclude group: 'com.android.support'
+//    }
     implementation 'com.lzy.net:okgo:3.0.4'
     // implementation 'com.tencent.bugly:crashreport_upgrade:latest.release'
     implementation 'com.owen:tv-recyclerview:3.0.0'
@@ -147,4 +155,11 @@ dependencies {
     implementation 'com.github.hedzr:android-file-chooser:v1.2.0-final'
     implementation 'commons-io:commons-io:2.11.0'
     implementation 'com.googlecode.juniversalchardet:juniversalchardet:1.0.3'
+    //支持http3
+    implementation ('com.google.net.cronet:cronet-okhttp:0.1.0')
+//    implementation 'com.google.android.gms:play-services-cronet:18.0.1'
+    implementation ('org.chromium.net:cronet-embedded:101.4951.41')
+    implementation 'org.brotli:dec:0.1.2'
+
 }
+
